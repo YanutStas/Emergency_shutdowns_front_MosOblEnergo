@@ -12,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "МосОблЭнерго Отключения",
-  description: "Аварийные отключения",
+  title: "МосОблЭнерго ТН",
+  description: "Технологические нарушения",
 };
 
 export default function RootLayout({ children }) {

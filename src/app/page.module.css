@@ -4,10 +4,8 @@
   --gray-alpha-100: rgba(var(--gray-rgb), 0.05);
   --button-primary-hover: #383838;
   --button-secondary-hover: #f2f2f2;
-  align-items: center; /* Выравнивание по центру */
-  justify-content: center; /* Выравнивание по центру */
-  padding: 80px;
-  gap: 64px;
+  align-items: center; 
+  justify-content: center; 
   font-family: var(--font-geist-sans);
   min-height: 100vh;
   display: flex;
@@ -17,16 +15,16 @@
 .main {
   display: flex;
   flex-direction: column;
-  align-items: center; /* Выравнивание по центру */
-  justify-content: center; /* Выравнивание по центру */
+  align-items: center; 
+  justify-content: center; 
   flex: 1;
   gap: 32px;
-  text-align: center; /* Текст по центру */
+  text-align: center; 
 }
 
 .logo {
-  width: 240px; /* Увеличенная ширина */
-  height: 50px; /* Увеличенная высота */
+  width: 240px;
+  height: 50px; 
 }
 
 .main ol {
@@ -37,12 +35,10 @@
   line-height: 24px;
   letter-spacing: -0.01em;
   list-style-position: inside;
-  text-align: center; /* Текст по центру */
+  text-align: center; 
 }
 
 
-
-/* Enable hover only on non-touch devices */
 @media (hover: hover) and (pointer: fine) {
   a.primary:hover {
     background: var(--button-primary-hover);
