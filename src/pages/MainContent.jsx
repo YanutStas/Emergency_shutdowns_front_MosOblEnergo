@@ -143,10 +143,7 @@ const IncidentList = ({ incidents, type, formatDate, extractText }) => (
           <Card className={`incident-card ${type}`}>
             <IdTN id={incident.id} />
             <StartDate
-              date={formatDate(
-                incident.start_date,
-                incident.start_time
-              )}
+              date={formatDate(incident.start_date, incident.start_time)}
             />
             <Description text={extractText(incident.description)} />
 
@@ -168,13 +165,9 @@ const IncidentList = ({ incidents, type, formatDate, extractText }) => (
 );
 
 const DurationInfo = ({ incident, formatDate }) => {
-  const start = new Date(
-    `${incident.start_date}T${incident.start_time}`
-  );
+  const start = new Date(`${incident.start_date}T${incident.start_time}`);
 
-  const end = new Date(
-    `${incident.end_date}T${incident.end_time}`
-  );
+  const end = new Date(`${incident.end_date}T${incident.end_time}`);
 
   const durationHours = Math.round((end - start) / (1000 * 60 * 60));
 

@@ -17,12 +17,19 @@ const useAuthStore = create((set) => ({
 
       const data = await response.json();
 
+      // В хранилище authStore.js
       if (data.error) {
-        // Переводим стандартные ошибки Strapi
         let message = data.error.message;
-        if (message.includes("Invalid identifier or password")) {
-          message = "Неверный email или пароль";
-        }
+
+        // Добавляем все возможные переводы
+        const errorTranslations = {
+          "Invalid identifier or password": "Неверный email или пароль",
+          "Missing credentials": "Заполните все обязательные поля",
+          "Your account has been blocked": "Ваш аккаунт заблокирован",
+          "Too many requests": "Слишком много попыток. Попробуйте позже",
+        };
+
+        message = errorTranslations[message] || message;
         throw new Error(message);
       }
 
@@ -43,7 +50,6 @@ const useAuthStore = create((set) => ({
 }));
 
 export default useAuthStore;
-
 // import { create } from "zustand";
 
 // const useAuthStore = create((set) => ({
