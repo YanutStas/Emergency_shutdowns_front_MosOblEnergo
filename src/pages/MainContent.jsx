@@ -23,11 +23,11 @@ const MainContent = () => {
         });
 
         if (!response.ok) {
-          if (response.status === 401) logout();
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const { data } = await response.json();
+        const { data } = await response.json(); // <-- Сначала получаем data
+        console.log("Проверяем data", data); // <-- Потом выводим в консоль
         setIncidents(data || []);
       } catch (err) {
         setError(err.message);
@@ -36,15 +36,16 @@ const MainContent = () => {
       }
     };
 
+    console.log("Проверяем token", token);
     fetchIncidents();
   }, [token, logout]);
 
   const activeIncidents = incidents.filter(
-    (incident) => incident.status === "в работе"
+    (incident) => incident.status_incident?.trim() === "в работе"
   );
 
   const completedIncidents = incidents.filter(
-    (incident) => incident.status === "выполнена"
+    (incident) => incident.status_incident === "выполнена"
   );
 
   const formatDate = (dateString, timeString) => {
