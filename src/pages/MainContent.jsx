@@ -1,11 +1,21 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Spin, Alert, Card, List, Tabs, Button } from "antd";
+import {
+  Spin,
+  Alert,
+  Tabs,
+  Collapse,
+  Typography,
+  Row,
+  Col,
+  Button,
+} from "antd";
 import useAuthStore from "../stores/authStore";
-import IdTN from "../components/CardComponent/Id";
-import StartDate from "../components/CardComponent/StartDate";
-import Description from "../components/CardComponent/Description";
-import EstimatedRestorationTime from "../components/CardComponent/EstimatedRestorationTime";
+import Container from "../components/Container";
+import styles from "./Incidents.module.css";
+
+const { Title } = Typography;
+const { Panel } = Collapse;
 
 const MainContent = () => {
   const { token, logout } = useAuthStore();
@@ -21,13 +31,10 @@ const MainContent = () => {
             Authorization: `Bearer ${token}`,
           },
         });
-
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-
-        const { data } = await response.json(); // <-- Сначала получаем data
-        console.log("Проверяем data", data); // <-- Потом выводим в консоль
+        const { data } = await response.json();
         setIncidents(data || []);
       } catch (err) {
         setError(err.message);
@@ -35,22 +42,18 @@ const MainContent = () => {
         setLoading(false);
       }
     };
-
-    console.log("Проверяем token", token);
     fetchIncidents();
-  }, [token, logout]);
+  }, [token]);
 
   const activeIncidents = incidents.filter(
     (incident) => incident.status_incident?.trim() === "в работе"
   );
-
   const completedIncidents = incidents.filter(
     (incident) => incident.status_incident === "выполнена"
   );
 
   const formatDate = (dateString, timeString) => {
     if (!dateString || !timeString) return "Нет данных";
-
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return "Некорректная дата";
 
@@ -76,108 +79,127 @@ const MainContent = () => {
     );
   };
 
-  if (loading) return <Spin size="large" className="center-spinner" />;
-
-  if (error)
+  const renderActiveIncidents = () => {
     return (
-      <Alert
-        message="Ошибка загрузки данных"
-        description={error}
-        type="error"
-        className="error-alert"
-      />
+      <Collapse className={styles.tabContent}>
+        {activeIncidents.map((incident) => (
+          <Panel
+            key={incident.id}
+            header={`ТН №${incident.id}`}
+            className={styles.panelHeader}
+          >
+            <div className={styles.panelBody}>
+              <Row gutter={[0, 10]}>
+                <Col span={24}>
+                  <strong>Дата начала:</strong>{" "}
+                  {formatDate(incident.start_date, incident.start_time)}
+                </Col>
+                <Col span={24}>
+                  <strong>Описание:</strong> {extractText(incident.description)}
+                </Col>
+                <Col span={24}>
+                  <strong>Прогноз восстановления:</strong>{" "}
+                  {formatDate(
+                    incident.estimated_restoration_time?.split("T")[0],
+                    incident.estimated_restoration_time?.split("T")[1]
+                  )}
+                </Col>
+              </Row>
+            </div>
+          </Panel>
+        ))}
+      </Collapse>
     );
+  };
+
+  const renderCompletedIncidents = () => {
+    return (
+      <Collapse className={styles.tabContent}>
+        {completedIncidents.map((incident) => {
+          const start = new Date(
+            `${incident.start_date}T${incident.start_time}`
+          );
+          const end = new Date(`${incident.end_date}T${incident.end_time}`);
+          const durationHours = Math.round((end - start) / (1000 * 60 * 60));
+
+          return (
+            <Panel
+              key={incident.id}
+              header={`ТН №${incident.id}`}
+              className={styles.panelHeader}
+            >
+              <div className={styles.panelBody}>
+                <Row gutter={[0, 10]}>
+                  <Col span={24}>
+                    <strong>Дата начала:</strong>{" "}
+                    {formatDate(incident.start_date, incident.start_time)}
+                  </Col>
+                  <Col span={24}>
+                    <strong>Описание:</strong>{" "}
+                    {extractText(incident.description)}
+                  </Col>
+                  <Col span={24}>
+                    <strong>Дата окончания:</strong>{" "}
+                    {formatDate(incident.end_date, incident.end_time)}
+                  </Col>
+                  <Col span={24}>
+                    <strong>Продолжительность:</strong> {durationHours} часов
+                  </Col>
+                  <Col span={24}>
+                    <strong>Описание закрытия:</strong>{" "}
+                    {extractText(incident.closure_description)}
+                  </Col>
+                </Row>
+              </div>
+            </Panel>
+          );
+        })}
+      </Collapse>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: "center", marginTop: 50 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ marginTop: 50 }}>
+        <Alert
+          message="Ошибка загрузки данных"
+          description={error}
+          type="error"
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="main-container">
-      <div className="logout-container">
+    <Container>
+      <div style={{ textAlign: "right", marginTop: 20, marginBottom: 20 }}>
         <Button type="primary" danger onClick={logout}>
           Выйти
         </Button>
       </div>
-
-      <Tabs
-        defaultActiveKey="1"
-        items={[
-          {
-            key: "1",
-            label: `Начало ТН (${activeIncidents.length})`,
-            children: (
-              <IncidentList
-                incidents={activeIncidents}
-                type="active"
-                formatDate={formatDate}
-                extractText={extractText}
-              />
-            ),
-          },
-          {
-            key: "2",
-            label: `Окончание ТН (${completedIncidents.length})`,
-            children: (
-              <IncidentList
-                incidents={completedIncidents}
-                type="completed"
-                formatDate={formatDate}
-                extractText={extractText}
-              />
-            ),
-          },
-        ]}
-      />
-    </div>
-  );
-};
-
-const IncidentList = ({ incidents, type, formatDate, extractText }) => (
-  <section className="incident-section">
-    <h2 className="section-title">
-      {type === "active"
-        ? "Активные технологические нарушения"
-        : "Завершенные технологические нарушения"}
-    </h2>
-
-    <List
-      dataSource={incidents}
-      renderItem={(incident) => (
-        <List.Item className="list-item">
-          <Card className={`incident-card ${type}`}>
-            <IdTN id={incident.id} />
-            <StartDate
-              date={formatDate(incident.start_date, incident.start_time)}
-            />
-            <Description text={extractText(incident.description)} />
-
-            {type === "active" ? (
-              <EstimatedRestorationTime
-                date={formatDate(
-                  incident.estimated_restoration_time?.split("T")[0],
-                  incident.estimated_restoration_time?.split("T")[1]
-                )}
-              />
-            ) : (
-              <DurationInfo incident={incident} formatDate={formatDate} />
-            )}
-          </Card>
-        </List.Item>
-      )}
-    />
-  </section>
-);
-
-const DurationInfo = ({ incident, formatDate }) => {
-  const start = new Date(`${incident.start_date}T${incident.start_time}`);
-
-  const end = new Date(`${incident.end_date}T${incident.end_time}`);
-
-  const durationHours = Math.round((end - start) / (1000 * 60 * 60));
-
-  return (
-    <div className="duration-info">
-      <p>
-        <strong>Продолжительность:</strong> {durationHours} часов
-      </p>
-    </div>
+      <Title level={1} className={styles.title}>
+        Технологические нарушения
+      </Title>
+      <Tabs defaultActiveKey="1" className={styles.tabContent}>
+        <Tabs.TabPane tab={`Начало ТН (${activeIncidents.length})`} key="1">
+          {renderActiveIncidents()}
+        </Tabs.TabPane>
+        <Tabs.TabPane
+          tab={`Окончание ТН (${completedIncidents.length})`}
+          key="2"
+        >
+          {renderCompletedIncidents()}
+        </Tabs.TabPane>
+      </Tabs>
+    </Container>
   );
 };
 
