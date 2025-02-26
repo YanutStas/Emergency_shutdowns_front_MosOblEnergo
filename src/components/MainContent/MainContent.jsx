@@ -8,64 +8,30 @@ import {
   Typography,
   Row,
   Col,
-  Button,
   Switch,
+  Button,
 } from "antd";
 import useAuthStore from "../../stores/authStore";
+import { useIncidentsUtilsStore } from "../../stores/incidentsUtilsStore";
+import NewIncidentModal from "./NewIncidentModal";
 
 const { Title, Text } = Typography;
-const { Panel } = Collapse;
-
-// Вспомогательные функции
-function extractText(richText) {
-  if (!richText || !Array.isArray(richText)) return "Нет данных";
-  return richText
-    .map((block) => block?.children?.map((child) => child.text).join(" "))
-    .join("\n");
-}
-
-function formatTime(timeStr) {
-  if (!timeStr) return "";
-  const parts = timeStr.split(":");
-  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : timeStr;
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return "";
-  const parts = dateStr.split("-");
-  return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : dateStr;
-}
-
-function formatDateTime(dateTimeStr) {
-  if (!dateTimeStr) return "";
-  const dateObj = new Date(dateTimeStr);
-  // Используем UTC для стабильного результата
-  const dd = String(dateObj.getUTCDate()).padStart(2, "0");
-  const mm = String(dateObj.getUTCMonth() + 1).padStart(2, "0");
-  const yyyy = dateObj.getUTCFullYear();
-  const hh = String(dateObj.getUTCHours()).padStart(2, "0");
-  const min = String(dateObj.getUTCMinutes()).padStart(2, "0");
-  return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
-}
-
-function getPanelHeader(incident) {
-  if (incident.status_incident?.trim() === "выполнена") {
-    return `ТН №${incident.id} ${formatDate(incident.start_date)} ${formatTime(
-      incident.start_time
-    )} - ${formatDate(incident.end_date)} ${formatTime(incident.end_time)}`;
-  }
-  return `ТН №${incident.id} ${formatDate(incident.start_date)} ${formatTime(
-    incident.start_time
-  )}`;
-}
 
 export default function MainContent() {
-  const { token, logout } = useAuthStore();
+  const { token } = useAuthStore();
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
-  // Запрос данных со Strapi с populate=*
+  const {
+    extractText,
+    formatTime,
+    formatDate,
+    formatDateTime,
+    getPanelHeader,
+  } = useIncidentsUtilsStore();
+
   useEffect(() => {
     async function fetchIncidents() {
       try {
@@ -89,7 +55,6 @@ export default function MainContent() {
     fetchIncidents();
   }, [token]);
 
-  // Фильтрация по статусу
   const activeIncidents = incidents.filter(
     (item) => item.status_incident?.trim() === "в работе"
   );
@@ -117,79 +82,68 @@ export default function MainContent() {
     );
   }
 
-  // Используем новую структуру Tabs с items
+  const activeItems = activeIncidents.map((incident) => ({
+    key: incident.id,
+    label: getPanelHeader(incident),
+    children: <IncidentDetails incident={incident} />,
+  }));
+
+  const completedItems = completedIncidents.map((incident) => ({
+    key: incident.id,
+    label: getPanelHeader(incident),
+    children: <IncidentDetails incident={incident} />,
+  }));
+
   const tabItems = [
     {
       key: "1",
       label: `Начало ТН (${activeIncidents.length})`,
-      children: (
-        <Collapse
-          items={activeIncidents.map((incident) => ({
-            key: incident.id,
-            label: getPanelHeader(incident),
-            children: <IncidentDetails incident={incident} />,
-          }))}
-        />
-      ),
+      children: <Collapse items={activeItems} />,
     },
     {
       key: "2",
       label: `Окончание ТН (${completedIncidents.length})`,
-      children: (
-        <Collapse
-          items={completedIncidents.map((incident) => ({
-            key: incident.id,
-            label: getPanelHeader(incident),
-            children: <IncidentDetails incident={incident} />,
-          }))}
-        />
-      ),
+      children: <Collapse items={completedItems} />,
     },
   ];
 
   return (
     <div style={{ padding: 20 }}>
-      {/* <div style={{ textAlign: "right", marginBottom: 10 }}>
-        <Button type="primary" danger onClick={logout}>
-          Выйти
+      {/* Заголовок и кнопка "Новое ТН" */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 15,
+        }}
+      >
+        <Title level={2} style={{ margin: 0 }}>
+          Технологические нарушения
+        </Title>
+        <Button type="primary" onClick={() => setModalVisible(true)}>
+          Новое ТН
         </Button>
-      </div> */}
-      <Title level={2} style={{ margin: 0 }}>
-        Технологические нарушения
-      </Title>
+      </div>
       <Tabs
         defaultActiveKey="1"
         items={tabItems}
         style={{ marginTop: 10, width: "100%" }}
+      />
+      <NewIncidentModal
+        visible={modalVisible}
+        onCancel={() => setModalVisible(false)}
       />
     </div>
   );
 }
 
 function IncidentDetails({ incident }) {
-  // Распаковка полей
-  const {
-    documentId,
-    start_time,
-    start_date,
-    status_incident,
-    estimated_restoration_time,
-    end_time,
-    end_date,
-    description,
-    closure_description,
-    sent_to_telegram,
-    sent_to_arm_edds,
-    sent_to_moenergo,
-    sent_to_minenergo,
-    AddressInfo,
-    DisruptionStats,
-  } = incident;
-
+  const { extractText, formatTime, formatDate, formatDateTime } =
+    useIncidentsUtilsStore();
   let durationHours = null;
-  if (end_date && end_time) {
-    const start = new Date(`${start_date}T${start_time}`);
-    const end = new Date(`${end_date}T${end_time}`);
+  if (incident.end_date && incident.end_time) {
+    const start = new Date(`${incident.start_date}T${incident.start_time}`);
+    const end = new Date(`${incident.end_date}T${incident.end_time}`);
     if (!isNaN(start) && !isNaN(end)) {
       durationHours = Math.round((end - start) / (1000 * 60 * 60));
     }
@@ -200,22 +154,22 @@ function IncidentDetails({ incident }) {
       <Col span={24}>
         <Title level={5}>Основная информация</Title>
         <p>
-          <strong>Статус:</strong> {status_incident || "нет"}
+          <strong>Статус:</strong> {incident.status_incident || "нет"}
         </p>
         <p>
-          <strong>Дата начала:</strong> {formatDate(start_date)}{" "}
-          {formatTime(start_time)}
+          <strong>Дата начала:</strong> {formatDate(incident.start_date)}{" "}
+          {formatTime(incident.start_time)}
         </p>
         <p>
           <strong>Прогноз восстановления:</strong>{" "}
-          {estimated_restoration_time
-            ? formatDateTime(estimated_restoration_time)
+          {incident.estimated_restoration_time
+            ? formatDateTime(incident.estimated_restoration_time)
             : "нет"}
         </p>
-        {end_date && end_time && (
+        {incident.end_date && incident.end_time && (
           <p>
-            <strong>Дата окончания:</strong> {formatDate(end_date)}{" "}
-            {formatTime(end_time)}
+            <strong>Дата окончания:</strong> {formatDate(incident.end_date)}{" "}
+            {formatTime(incident.end_time)}
           </p>
         )}
         {durationHours !== null && (
@@ -226,63 +180,64 @@ function IncidentDetails({ incident }) {
       </Col>
       <Col span={24}>
         <Title level={5}>Описание</Title>
-        <Text>{extractText(description)}</Text>
+        <Text>{extractText(incident.description)}</Text>
       </Col>
-      {closure_description && (
+      {incident.closure_description && (
         <Col span={24}>
           <Title level={5}>Описание закрытия</Title>
-          <Text>{extractText(closure_description)}</Text>
+          <Text>{extractText(incident.closure_description)}</Text>
         </Col>
       )}
-      {AddressInfo && (
+      {incident.AddressInfo && (
         <Col span={24}>
           <Title level={5}>Адресная информация</Title>
           <p>
             <strong>Тип поселения:</strong>{" "}
-            {AddressInfo.settlement_type || "нет"}
+            {incident.AddressInfo.settlement_type || "нет"}
           </p>
           <p>
-            <strong>Улицы:</strong> {AddressInfo.streets || "нет"}
+            <strong>Улицы:</strong> {incident.AddressInfo.streets || "нет"}
           </p>
           <p>
-            <strong>Тип застройки:</strong> {AddressInfo.building_type || "нет"}
+            <strong>Тип застройки:</strong>{" "}
+            {incident.AddressInfo.building_type || "нет"}
           </p>
         </Col>
       )}
-      {DisruptionStats && (
+      {incident.DisruptionStats && (
         <Col span={24}>
           <Title level={5}>Статистика отключения</Title>
           <p>
             <strong>Отключено населенных пунктов:</strong>{" "}
-            {DisruptionStats.affected_settlements || "0"}
+            {incident.DisruptionStats.affected_settlements || "0"}
           </p>
           <p>
             <strong>Отключено жителей:</strong>{" "}
-            {DisruptionStats.affected_residents || "0"}
+            {incident.DisruptionStats.affected_residents || "0"}
           </p>
           <p>
             <strong>Отключено МКД:</strong>{" "}
-            {DisruptionStats.affected_mkd || "0"}
+            {incident.DisruptionStats.affected_mkd || "0"}
           </p>
           <p>
             <strong>Отключено больниц:</strong>{" "}
-            {DisruptionStats.affected_hospitals || "0"}
+            {incident.DisruptionStats.affected_hospitals || "0"}
           </p>
           <p>
             <strong>Отключено поликлиник:</strong>{" "}
-            {DisruptionStats.affected_clinics || "0"}
+            {incident.DisruptionStats.affected_clinics || "0"}
           </p>
           <p>
             <strong>Отключено школ:</strong>{" "}
-            {DisruptionStats.affected_schools || "0"}
+            {incident.DisruptionStats.affected_schools || "0"}
           </p>
           <p>
             <strong>Отключено детсадов:</strong>{" "}
-            {DisruptionStats.affected_kindergartens || "0"}
+            {incident.DisruptionStats.affected_kindergartens || "0"}
           </p>
           <p>
             <strong>boiler_shutdown:</strong>{" "}
-            {DisruptionStats.boiler_shutdown || "0"}
+            {incident.DisruptionStats.boiler_shutdown || "0"}
           </p>
         </Col>
       )}
@@ -290,21 +245,272 @@ function IncidentDetails({ incident }) {
         <Title level={5}>Отправка данных</Title>
         <p>
           <strong>Отправлено в Telegram:</strong>{" "}
-          <Switch checked={!!sent_to_telegram} disabled />
+          <Switch checked={!!incident.sent_to_telegram} disabled />
         </p>
         <p>
           <strong>Отправлено в АРМ ЕДДС:</strong>{" "}
-          <Switch checked={!!sent_to_arm_edds} disabled />
+          <Switch checked={!!incident.sent_to_arm_edds} disabled />
         </p>
         <p>
           <strong>Отправлено на сайт Мособлэнерго:</strong>{" "}
-          <Switch checked={!!sent_to_moenergo} disabled />
+          <Switch checked={!!incident.sent_to_moenergo} disabled />
         </p>
         <p>
           <strong>Отправлено на сайт Минэнерго:</strong>{" "}
-          <Switch checked={!!sent_to_minenergo} disabled />
+          <Switch checked={!!incident.sent_to_minenergo} disabled />
         </p>
       </Col>
     </Row>
   );
 }
+
+// "use client";
+// import React, { useEffect, useState } from "react";
+// import {
+//   Spin,
+//   Alert,
+//   Tabs,
+//   Collapse,
+//   Typography,
+//   Row,
+//   Col,
+//   Switch,
+// } from "antd";
+// import useAuthStore from "../../stores/authStore";
+// import { useIncidentsUtilsStore } from "../../stores/incidentsUtilsStore";
+
+// const { Title, Text } = Typography;
+
+// export default function MainContent() {
+//   const { token } = useAuthStore();
+//   const [incidents, setIncidents] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+
+//   // Деструктурируем функции из нашего store
+//   const {
+//     extractText,
+//     formatTime,
+//     formatDate,
+//     formatDateTime,
+//     getPanelHeader,
+//   } = useIncidentsUtilsStore();
+
+//   // Запрос данных со Strapi с populate=*
+//   useEffect(() => {
+//     async function fetchIncidents() {
+//       try {
+//         const response = await fetch(
+//           "http://localhost:1337/api/incidents?populate=*",
+//           {
+//             headers: { Authorization: `Bearer ${token}` },
+//           }
+//         );
+//         if (!response.ok) {
+//           throw new Error(`HTTP error! status: ${response.status}`);
+//         }
+//         const result = await response.json();
+//         setIncidents(result.data || []);
+//       } catch (err) {
+//         setError(err.message);
+//       } finally {
+//         setLoading(false);
+//       }
+//     }
+//     fetchIncidents();
+//   }, [token]);
+
+//   // Фильтрация по статусу
+//   const activeIncidents = incidents.filter(
+//     (item) => item.status_incident?.trim() === "в работе"
+//   );
+//   const completedIncidents = incidents.filter(
+//     (item) => item.status_incident?.trim() === "выполнена"
+//   );
+
+//   if (loading) {
+//     return (
+//       <div style={{ textAlign: "center", marginTop: 50 }}>
+//         <Spin size="large" />
+//       </div>
+//     );
+//   }
+
+//   if (error) {
+//     return (
+//       <div style={{ marginTop: 50 }}>
+//         <Alert
+//           message="Ошибка загрузки данных"
+//           description={error}
+//           type="error"
+//         />
+//       </div>
+//     );
+//   }
+
+//   // Формируем элементы Collapse с помощью нового синтаксиса
+//   const activeItems = activeIncidents.map((incident) => ({
+//     key: incident.id,
+//     label: getPanelHeader(incident),
+//     children: <IncidentDetails incident={incident} />,
+//   }));
+
+//   const completedItems = completedIncidents.map((incident) => ({
+//     key: incident.id,
+//     label: getPanelHeader(incident),
+//     children: <IncidentDetails incident={incident} />,
+//   }));
+
+//   const tabItems = [
+//     {
+//       key: "1",
+//       label: `Начало ТН (${activeIncidents.length})`,
+//       children: <Collapse items={activeItems} />,
+//     },
+//     {
+//       key: "2",
+//       label: `Окончание ТН (${completedIncidents.length})`,
+//       children: <Collapse items={completedItems} />,
+//     },
+//   ];
+
+//   return (
+//     <div style={{ padding: 20 }}>
+//       <Title level={2} style={{ margin: 0 }}>
+//         Технологические нарушения
+//       </Title>
+//       <Tabs
+//         defaultActiveKey="1"
+//         items={tabItems}
+//         style={{ marginTop: 10, width: "100%" }}
+//       />
+//     </div>
+//   );
+// }
+
+// function IncidentDetails({ incident }) {
+//   const { extractText, formatTime, formatDate, formatDateTime } =
+//     useIncidentsUtilsStore();
+//   let durationHours = null;
+//   if (incident.end_date && incident.end_time) {
+//     const start = new Date(`${incident.start_date}T${incident.start_time}`);
+//     const end = new Date(`${incident.end_date}T${incident.end_time}`);
+//     if (!isNaN(start) && !isNaN(end)) {
+//       durationHours = Math.round((end - start) / (1000 * 60 * 60));
+//     }
+//   }
+
+//   return (
+//     <Row gutter={[0, 16]}>
+//       <Col span={24}>
+//         <Title level={5}>Основная информация</Title>
+//         <p>
+//           <strong>Статус:</strong> {incident.status_incident || "нет"}
+//         </p>
+//         <p>
+//           <strong>Дата начала:</strong> {formatDate(incident.start_date)}{" "}
+//           {formatTime(incident.start_time)}
+//         </p>
+//         <p>
+//           <strong>Прогноз восстановления:</strong>{" "}
+//           {incident.estimated_restoration_time
+//             ? formatDateTime(incident.estimated_restoration_time)
+//             : "нет"}
+//         </p>
+//         {incident.end_date && incident.end_time && (
+//           <p>
+//             <strong>Дата окончания:</strong> {formatDate(incident.end_date)}{" "}
+//             {formatTime(incident.end_time)}
+//           </p>
+//         )}
+//         {durationHours !== null && (
+//           <p>
+//             <strong>Продолжительность:</strong> {durationHours} часов
+//           </p>
+//         )}
+//       </Col>
+//       <Col span={24}>
+//         <Title level={5}>Описание</Title>
+//         <Text>{extractText(incident.description)}</Text>
+//       </Col>
+//       {incident.closure_description && (
+//         <Col span={24}>
+//           <Title level={5}>Описание закрытия</Title>
+//           <Text>{extractText(incident.closure_description)}</Text>
+//         </Col>
+//       )}
+//       {incident.AddressInfo && (
+//         <Col span={24}>
+//           <Title level={5}>Адресная информация</Title>
+//           <p>
+//             <strong>Тип поселения:</strong>{" "}
+//             {incident.AddressInfo.settlement_type || "нет"}
+//           </p>
+//           <p>
+//             <strong>Улицы:</strong> {incident.AddressInfo.streets || "нет"}
+//           </p>
+//           <p>
+//             <strong>Тип застройки:</strong>{" "}
+//             {incident.AddressInfo.building_type || "нет"}
+//           </p>
+//         </Col>
+//       )}
+//       {incident.DisruptionStats && (
+//         <Col span={24}>
+//           <Title level={5}>Статистика отключения</Title>
+//           <p>
+//             <strong>Отключено населенных пунктов:</strong>{" "}
+//             {incident.DisruptionStats.affected_settlements || "0"}
+//           </p>
+//           <p>
+//             <strong>Отключено жителей:</strong>{" "}
+//             {incident.DisruptionStats.affected_residents || "0"}
+//           </p>
+//           <p>
+//             <strong>Отключено МКД:</strong>{" "}
+//             {incident.DisruptionStats.affected_mkd || "0"}
+//           </p>
+//           <p>
+//             <strong>Отключено больниц:</strong>{" "}
+//             {incident.DisruptionStats.affected_hospitals || "0"}
+//           </p>
+//           <p>
+//             <strong>Отключено поликлиник:</strong>{" "}
+//             {incident.DisruptionStats.affected_clinics || "0"}
+//           </p>
+//           <p>
+//             <strong>Отключено школ:</strong>{" "}
+//             {incident.DisruptionStats.affected_schools || "0"}
+//           </p>
+//           <p>
+//             <strong>Отключено детсадов:</strong>{" "}
+//             {incident.DisruptionStats.affected_kindergartens || "0"}
+//           </p>
+//           <p>
+//             <strong>boiler_shutdown:</strong>{" "}
+//             {incident.DisruptionStats.boiler_shutdown || "0"}
+//           </p>
+//         </Col>
+//       )}
+//       <Col span={24}>
+//         <Title level={5}>Отправка данных</Title>
+//         <p>
+//           <strong>Отправлено в Telegram:</strong>{" "}
+//           <Switch checked={!!incident.sent_to_telegram} disabled />
+//         </p>
+//         <p>
+//           <strong>Отправлено в АРМ ЕДДС:</strong>{" "}
+//           <Switch checked={!!incident.sent_to_arm_edds} disabled />
+//         </p>
+//         <p>
+//           <strong>Отправлено на сайт Мособлэнерго:</strong>{" "}
+//           <Switch checked={!!incident.sent_to_moenergo} disabled />
+//         </p>
+//         <p>
+//           <strong>Отправлено на сайт Минэнерго:</strong>{" "}
+//           <Switch checked={!!incident.sent_to_minenergo} disabled />
+//         </p>
+//       </Col>
+//     </Row>
+//   );
+// }
