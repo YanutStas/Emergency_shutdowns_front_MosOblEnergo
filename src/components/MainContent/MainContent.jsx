@@ -123,27 +123,26 @@ export default function MainContent() {
       key: "1",
       label: `Начало ТН (${activeIncidents.length})`,
       children: (
-        <Collapse>
-          {activeIncidents.map((incident) => (
-            <Panel key={incident.id} header={getPanelHeader(incident)}>
-              <IncidentDetails incident={incident} />
-            </Panel>
-          ))}
-        </Collapse>
+        <Collapse
+          items={activeIncidents.map((incident) => ({
+            key: incident.id,
+            label: getPanelHeader(incident),
+            children: <IncidentDetails incident={incident} />,
+          }))}
+        />
       ),
     },
     {
       key: "2",
       label: `Окончание ТН (${completedIncidents.length})`,
       children: (
-        <Collapse>
-          {completedIncidents.map((incident) => (
-            <Panel key={incident.id} header={getPanelHeader(incident)}>
-              <IncidentDetails incident={incident} />
-            </Panel>
-
-          ))}
-        </Collapse>
+        <Collapse
+          items={completedIncidents.map((incident) => ({
+            key: incident.id,
+            label: getPanelHeader(incident),
+            children: <IncidentDetails incident={incident} />,
+          }))}
+        />
       ),
     },
   ];
@@ -158,7 +157,11 @@ export default function MainContent() {
       <Title level={2} style={{ margin: 0 }}>
         Технологические нарушения
       </Title>
-      <Tabs defaultActiveKey="1" items={tabItems} style={{ marginTop: 10 }} />
+      <Tabs
+        defaultActiveKey="1"
+        items={tabItems}
+        style={{ marginTop: 10, width: "100%" }}
+      />
     </div>
   );
 }
@@ -196,9 +199,6 @@ function IncidentDetails({ incident }) {
     <Row gutter={[0, 16]}>
       <Col span={24}>
         <Title level={5}>Основная информация</Title>
-        {/* <p>
-          <strong>documentId:</strong> {documentId || "нет"}
-        </p> */}
         <p>
           <strong>Статус:</strong> {status_incident || "нет"}
         </p>
