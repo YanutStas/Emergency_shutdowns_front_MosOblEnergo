@@ -9,11 +9,11 @@ const Main = () => {
 
   return (
     <>
-      <div
-        style={{ textAlign: "center", marginTop: "20px", marginBottom: "20px" }}
+      {/* <div
+        style={{ textAlign: "center" }}
       >
         <Image src="/logoBlue.svg" alt="Логотип" width={300} height={150} />
-      </div>
+      </div> */}
       {!token ? <AuthForm /> : <MainContent />}
     </>
   );

@@ -149,11 +149,11 @@ export default function MainContent() {
 
   return (
     <div style={{ padding: 20 }}>
-      <div style={{ textAlign: "right", marginBottom: 10 }}>
+      {/* <div style={{ textAlign: "right", marginBottom: 10 }}>
         <Button type="primary" danger onClick={logout}>
           Выйти
         </Button>
-      </div>
+      </div> */}
       <Title level={2} style={{ margin: 0 }}>
         Технологические нарушения
       </Title>
