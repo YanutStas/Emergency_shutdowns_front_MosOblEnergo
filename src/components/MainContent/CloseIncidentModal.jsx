@@ -23,12 +23,12 @@ export default function CloseIncidentModal({
   const [form] = Form.useForm();
   const { token } = useAuthStore();
 
-  // Устанавливаем начальные значения при открытии
   useEffect(() => {
     if (visible) {
       form.setFieldsValue({
         end_date: moment(),
         end_time: moment(),
+        // Убрали DisruptionStats
       });
     }
   }, [visible, form]);
@@ -74,27 +74,25 @@ export default function CloseIncidentModal({
 
       const result = await response.json();
       console.log("Ответ Strapi при закрытии ТН:", result);
-      message.success(
-        "ТН переведена в статус 'Выполнена'! Отличная работа, Morty!"
-      );
+      message.success("ТН переведена в статус 'Выполнена'!");
       onCancel();
       form.resetFields();
       onSuccess();
     } catch (err) {
       console.error("Ошибка закрытия ТН:", err);
-      message.error(
-        "Не удалось перевести ТН в статус 'Выполнена'. Что-то пошло не так, Morty!"
-      );
+      message.error("Не удалось перевести ТН в статус 'Выполнена'.");
     }
   };
 
-  // Кнопка "Волшебство" — чтобы быстро заполнить форму закрытия
+  // "Заполнить" — без статистики, только дата/время/описание
   const handleMagic = () => {
     const randomValues = getRandomCloseIncidentFields();
+    // Удаляем любые поля DisruptionStats, если они есть
+    delete randomValues.disruptionStats;
     form.setFieldsValue(randomValues);
-    message.info("Волшебство сработало! Поля заполнены случайными значениями.");
+    message.info("Заполнить сработало! Поля заполнены случайными значениями.");
   };
-  
+
   return (
     <Modal
       title="Закрыть ТН"
@@ -107,7 +105,7 @@ export default function CloseIncidentModal({
       okText="Отправить"
       cancelText="Отмена"
     >
-       <Form form={form} layout="vertical">
+      <Form form={form} layout="vertical">
         <Form.Item
           name="end_date"
           label="Дата окончания"
@@ -117,7 +115,6 @@ export default function CloseIncidentModal({
             locale={ru_RU.DatePicker}
             format="DD.MM.YYYY"
             style={{ width: "100%" }}
-            placeholder="Выберите дату"
           />
         </Form.Item>
 
@@ -126,11 +123,7 @@ export default function CloseIncidentModal({
           label="Время окончания"
           rules={[{ required: true, message: "Укажите время окончания" }]}
         >
-          <TimePicker
-            format="HH:mm"
-            style={{ width: "100%" }}
-            placeholder="Выберите время"
-          />
+          <TimePicker format="HH:mm" style={{ width: "100%" }} />
         </Form.Item>
 
         <Form.Item
@@ -145,7 +138,6 @@ export default function CloseIncidentModal({
         </Form.Item>
       </Form>
 
-
       <div style={{ textAlign: "right", marginTop: 10 }}>
         <Button onClick={handleMagic}>Заполнить</Button>
       </div>
@@ -153,10 +145,8 @@ export default function CloseIncidentModal({
   );
 }
 
-//
-
 // "use client";
-// import React from "react";
+// import React, { useEffect } from "react";
 // import {
 //   Modal,
 //   Form,
@@ -179,6 +169,16 @@ export default function CloseIncidentModal({
 // }) {
 //   const [form] = Form.useForm();
 //   const { token } = useAuthStore();
+
+//   // Устанавливаем начальные значения при открытии
+//   useEffect(() => {
+//     if (visible) {
+//       form.setFieldsValue({
+//         end_date: moment(),
+//         end_time: moment(),
+//       });
+//     }
+//   }, [visible, form]);
 
 //   const handleOk = async () => {
 //     try {
@@ -254,7 +254,7 @@ export default function CloseIncidentModal({
 //       okText="Отправить"
 //       cancelText="Отмена"
 //     >
-//       <Form form={form} layout="vertical">
+//        <Form form={form} layout="vertical">
 //         <Form.Item
 //           name="end_date"
 //           label="Дата окончания"
@@ -293,7 +293,7 @@ export default function CloseIncidentModal({
 //       </Form>
 
 //       <div style={{ textAlign: "right", marginTop: 10 }}>
-//         <Button onClick={handleMagic}>Волшебство</Button>
+//         <Button onClick={handleMagic}>Заполнить</Button>
 //       </div>
 //     </Modal>
 //   );
