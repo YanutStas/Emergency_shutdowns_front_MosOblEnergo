@@ -333,8 +333,8 @@ function IncidentDetails({ incident, onUpdate }) {
               {incident.DisruptionStats.affected_kindergartens || "0"}
             </p>
             <p>
-              <strong>boiler_shutdown:</strong>{" "}
-              {incident.DisruptionStats.boiler_shutdown ? "Да" : "Нет"}
+              <strong>Отключено бойлерных/котельн:</strong>{" "}
+              {incident.DisruptionStats.boiler_shutdown || "0"}
             </p>
           </Col>
         )}
