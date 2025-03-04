@@ -40,7 +40,9 @@ export default function NewIncidentModal({ visible, onCancel }) {
           throw new Error(`Ошибка при загрузке городов: ${res.status}`);
         }
         const data = await res.json();
+
         setCityDistricts(data.data || []);
+        console.log("data.data", data.data);
       } catch (err) {
         console.error("Ошибка загрузки city-districts:", err);
       }
@@ -98,7 +100,6 @@ export default function NewIncidentModal({ visible, onCancel }) {
         boiler_shutdown: ds.boiler_shutdown || 0,
       };
 
-      // Relation city_district
       const cityDistrictId = values.addressInfo?.city_district || null;
 
       const description = [
@@ -171,12 +172,11 @@ export default function NewIncidentModal({ visible, onCancel }) {
       };
     }
 
-    // ВАЖНО: выбираем реальный город из загруженных cityDistricts (если массив не пуст)
     if (cityDistricts.length > 0) {
       const randomIndex = Math.floor(Math.random() * cityDistricts.length);
       const randomCity = cityDistricts[randomIndex];
       // Подставляем реальный ID города в addressInfo
-      randomValues.addressInfo.city_district = randomCity.id;
+      randomValues.addressInfo.city_district = randomCity.documentId;
     }
 
     // Устанавливаем значения в форму
@@ -269,7 +269,7 @@ export default function NewIncidentModal({ visible, onCancel }) {
         >
           <Select placeholder="Выберите населенный пункт">
             {cityDistricts.map((city) => (
-              <Option key={city.id} value={city.id}>
+              <Option key={city.id} value={city.documentId}>
                 {city.name}
               </Option>
             ))}
