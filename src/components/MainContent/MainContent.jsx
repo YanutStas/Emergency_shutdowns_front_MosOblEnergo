@@ -3,14 +3,13 @@ import React, { useEffect, useState } from "react";
 import {
   Spin,
   Alert,
-  Collapse,
   Typography,
-  Row,
-  Col,
-  Switch,
   Button,
   Space,
   Pagination,
+  Table,
+  Switch,
+  message,
 } from "antd";
 import useAuthStore from "../../stores/authStore";
 import { useIncidentsUtilsStore } from "../../stores/incidentsUtilsStore";
@@ -28,6 +27,10 @@ export default function MainContent() {
   // Модалка "Новое ТН"
   const [newModalVisible, setNewModalVisible] = useState(false);
 
+  // Модалка "Закрыть ТН"
+  const [closeModalVisible, setCloseModalVisible] = useState(false);
+  const [currentIncidentId, setCurrentIncidentId] = useState(null);
+
   // Фильтр: "all", "active", "completed"
   const [filter, setFilter] = useState("all");
 
@@ -35,22 +38,11 @@ export default function MainContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  // Функции для форматирования
+  // Функции форматирования
   const { extractText, formatTime, formatDate, formatDateTime } =
     useIncidentsUtilsStore();
 
-  /**
-   * Вместо "ТН №…" показываем название города (если есть)
-   * + дата + время
-   */
-  const getPanelHeader = (incident) => {
-    const cityName = incident.AddressInfo?.city_district?.name || "Неизвестно";
-    const d = formatDate(incident.start_date);
-    const t = formatTime(incident.start_time);
-    return `${cityName} ${d} ${t}`;
-  };
-
-  // Загрузка инцидентов, учитывая Relation city_district внутри AddressInfo
+  // Загрузка инцидентов с нужным populate
   const fetchIncidents = async () => {
     setLoading(true);
     try {
@@ -78,7 +70,7 @@ export default function MainContent() {
     }
   }, [token]);
 
-  // Фильтрация по статусу
+  // Фильтрация инцидентов
   let filteredIncidents = [];
   if (filter === "all") {
     filteredIncidents = incidents;
@@ -92,7 +84,7 @@ export default function MainContent() {
     );
   }
 
-  // Сортируем от новых к старым
+  // Сортировка от новых к старым
   const sortedIncidents = [...filteredIncidents].sort((a, b) => {
     const dateA = new Date(`${a.start_date}T${a.start_time}`);
     const dateB = new Date(`${b.start_date}T${b.start_time}`);
@@ -105,181 +97,141 @@ export default function MainContent() {
   const endIndex = startIndex + pageSize;
   const pageIncidents = sortedIncidents.slice(startIndex, endIndex);
 
-  // Формируем items для Collapse
-  const collapseItems = pageIncidents.map((incident) => {
-    const bgColor =
-      incident.status_incident === "в работе" ? "#fff1f0" : "#f6ffed";
+  // Формируем dataSource для таблицы
+  const dataSource = pageIncidents.map((incident) => {
+    const cityName = incident.AddressInfo?.city_district?.name || "Неизвестно";
+    const streets = incident.AddressInfo?.streets || "-";
+    const startDateTime = `${formatDate(incident.start_date)} ${formatTime(
+      incident.start_time
+    )}`;
+    const endDate = incident.end_date ? formatDate(incident.end_date) : "-";
+    const endTime = incident.end_time ? formatTime(incident.end_time) : "-";
+    let restHours = "";
+    if (incident.estimated_restoration_time) {
+      const start = new Date(`${incident.start_date}T${incident.start_time}`);
+      const est = new Date(incident.estimated_restoration_time);
+      const diff = Math.round((est - start) / (1000 * 60 * 60));
+      restHours = diff >= 0 ? diff : 0;
+    }
     return {
       key: incident.id,
-      label: getPanelHeader(incident),
-      children: (
-        <IncidentDetails incident={incident} onUpdate={fetchIncidents} />
-      ),
-      style: { background: bgColor, marginBottom: 8 },
+      incident,
+      cityName,
+      streets,
+      startDateTime,
+      endDateTime: `${endDate} ${endTime}`,
+      restHours,
+      status_incident: incident.status_incident,
+      documentId: incident.documentId,
     };
   });
 
-  if (loading) {
-    return (
-      <div style={{ textAlign: "center", marginTop: 50 }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div style={{ marginTop: 50 }}>
-        <Alert type="error" message={error} />
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ padding: 20 }}>
-      {/* Заголовок и кнопка "Новое ТН" */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: 15,
-        }}
-      >
-        <Title level={2} style={{ margin: 0 }}>
-          Технологические нарушения
-        </Title>
-        <Button type="primary" onClick={() => setNewModalVisible(true)}>
-          Новое ТН
-        </Button>
-      </div>
-
-      {/* Мини-фильтр */}
-      <div style={{ marginBottom: 15 }}>
-        <Space.Compact>
-          <Button
-            type={filter === "all" ? "primary" : "default"}
-            onClick={() => {
-              setFilter("all");
-              setCurrentPage(1);
-            }}
-          >
-            Все ТН
-          </Button>
-          <Button
-            type={filter === "active" ? "primary" : "default"}
-            onClick={() => {
-              setFilter("active");
-              setCurrentPage(1);
-            }}
-          >
-            В работе
-          </Button>
-          <Button
-            type={filter === "completed" ? "primary" : "default"}
-            onClick={() => {
-              setFilter("completed");
-              setCurrentPage(1);
-            }}
-          >
-            Выполненные
-          </Button>
-        </Space.Compact>
-      </div>
-
-      <Collapse accordion items={collapseItems} />
-
-      {/* Пагинация */}
-      <div style={{ marginTop: 20, textAlign: "center" }}>
-        <Pagination
-          current={currentPage}
-          total={totalCount}
-          pageSize={pageSize}
-          onChange={(page) => setCurrentPage(page)}
-        />
-      </div>
-
-      {/* Модалка создания нового ТН */}
-      <NewIncidentModal
-        visible={newModalVisible}
-        onCancel={() => {
-          setNewModalVisible(false);
-          fetchIncidents();
-        }}
-      />
-    </div>
-  );
-}
-
-function IncidentDetails({ incident, onUpdate }) {
-  const { extractText, formatTime, formatDate, formatDateTime } =
-    useIncidentsUtilsStore();
-  const [closeModalVisible, setCloseModalVisible] = useState(false);
-
-  let durationHours = null;
-  if (incident.end_date && incident.end_time) {
-    const start = new Date(`${incident.start_date}T${incident.start_time}`);
-    const end = new Date(`${incident.end_date}T${incident.end_time}`);
-    if (!isNaN(start) && !isNaN(end)) {
-      durationHours = Math.round((end - start) / (1000 * 60 * 60));
-    }
-  }
-
-  return (
-    <>
-      <Row gutter={[0, 16]}>
-        <Col span={24}>
-          <Title level={5}>Основная информация</Title>
-          <p>
-            <strong>Статус:</strong> {incident.status_incident || "нет"}
-          </p>
-          <p>
-            <strong>Дата начала:</strong> {formatDate(incident.start_date)}{" "}
-            {formatTime(incident.start_time)}
-          </p>
-          <p>
-            <strong>Прогноз восстановления:</strong>{" "}
-            {incident.estimated_restoration_time
-              ? formatDateTime(incident.estimated_restoration_time)
-              : "нет"}
-          </p>
-          {incident.end_date && incident.end_time && (
-            <p>
-              <strong>Дата окончания:</strong> {formatDate(incident.end_date)}{" "}
-              {formatTime(incident.end_time)}
-            </p>
-          )}
-          {durationHours !== null && (
-            <p>
-              <strong>Продолжительность:</strong> {durationHours} часов
-            </p>
-          )}
-
-          {incident.status_incident?.trim() === "в работе" && (
+  // Определяем колонки таблицы
+  const columns = [
+    {
+      title: "Городской округ",
+      dataIndex: "cityName",
+      key: "cityName",
+    },
+    {
+      title: "Улицы",
+      dataIndex: "streets",
+      key: "streets",
+    },
+    {
+      title: "Дата и время отключения",
+      dataIndex: "startDateTime",
+      key: "startDateTime",
+    },
+    {
+      title: "Дата окончания",
+      dataIndex: "endDateTime",
+      key: "endDateTime",
+      render: (text, record) =>
+        record.status_incident?.trim() === "выполнена" ? text : "-",
+    },
+    {
+      title: "Прогнозируемое время включения (ч)",
+      dataIndex: "restHours",
+      key: "restHours",
+    },
+    {
+      title: "Действие",
+      key: "action",
+      render: (_, record) => {
+        if (record.status_incident?.trim() === "в работе") {
+          return (
             <Button
               type="default"
-              style={{ marginTop: 10 }}
-              onClick={() => setCloseModalVisible(true)}
+              onClick={() => {
+                setCurrentIncidentId(record.documentId);
+                setCloseModalVisible(true);
+              }}
             >
               Выполнена
             </Button>
-          )}
-        </Col>
+          );
+        }
+        return null;
+      },
+    },
+  ];
 
-        <Col span={24}>
-          <Title level={5}>Описание</Title>
-          <Text>{extractText(incident.description)}</Text>
-        </Col>
-
-        {incident.closure_description && (
-          <Col span={24}>
-            <Title level={5}>Описание закрытия</Title>
-            <Text>{extractText(incident.closure_description)}</Text>
-          </Col>
+  // expandedRowRender: расширенная информация по инциденту
+  const expandedRowRender = (record) => {
+    const incident = record.incident;
+    let durationHours = null;
+    if (incident.end_date && incident.end_time) {
+      const start = new Date(`${incident.start_date}T${incident.start_time}`);
+      const end = new Date(`${incident.end_date}T${incident.end_time}`);
+      if (!isNaN(start) && !isNaN(end)) {
+        durationHours = Math.round((end - start) / (1000 * 60 * 60));
+      }
+    }
+    return (
+      <div style={{ background: "#fafafa", padding: 16 }}>
+        <Title level={5}>Основная информация</Title>
+        <p>
+          <strong>Статус:</strong> {incident.status_incident || "нет"}
+        </p>
+        <p>
+          <strong>Дата начала:</strong> {formatDate(incident.start_date)}{" "}
+          {formatTime(incident.start_time)}
+        </p>
+        <p>
+          <strong>Прогноз восстановления:</strong>{" "}
+          {incident.estimated_restoration_time
+            ? formatDateTime(incident.estimated_restoration_time)
+            : "нет"}
+        </p>
+        {incident.end_date && incident.end_time && (
+          <p>
+            <strong>Дата окончания:</strong> {formatDate(incident.end_date)}{" "}
+            {formatTime(incident.end_time)}
+          </p>
+        )}
+        {durationHours !== null && (
+          <p>
+            <strong>Продолжительность:</strong> {durationHours} часов
+          </p>
         )}
 
-        {/* AddressInfo */}
+        <Title level={5}>Описание</Title>
+        <Text>{extractText(incident.description)}</Text>
+        {incident.closure_description && (
+          <>
+            <Title level={5} style={{ marginTop: 16 }}>
+              Описание закрытия
+            </Title>
+            <Text>{extractText(incident.closure_description)}</Text>
+          </>
+        )}
+
         {incident.AddressInfo && (
-          <Col span={24}>
-            <Title level={5}>Адресная информация</Title>
+          <>
+            <Title level={5} style={{ marginTop: 16 }}>
+              Адресная информация
+            </Title>
             <p>
               <strong>Тип поселения:</strong>{" "}
               {incident.AddressInfo.settlement_type || "нет"}
@@ -297,13 +249,14 @@ function IncidentDetails({ incident, onUpdate }) {
               <strong>Тип застройки:</strong>{" "}
               {incident.AddressInfo.building_type || "нет"}
             </p>
-          </Col>
+          </>
         )}
 
-        {/* DisruptionStats */}
         {incident.DisruptionStats && (
-          <Col span={24}>
-            <Title level={5}>Статистика отключения</Title>
+          <>
+            <Title level={5} style={{ marginTop: 16 }}>
+              Статистика отключения
+            </Title>
             <p>
               <strong>Отключено населенных пунктов:</strong>{" "}
               {incident.DisruptionStats.affected_settlements || "0"}
@@ -336,40 +289,141 @@ function IncidentDetails({ incident, onUpdate }) {
               <strong>Отключено бойлерных/котельн:</strong>{" "}
               {incident.DisruptionStats.boiler_shutdown || "0"}
             </p>
-          </Col>
+          </>
         )}
 
-        <Col span={24}>
-          <Title level={5}>Отправка данных</Title>
-          <p>
-            <strong>Отправлено в Telegram:</strong>{" "}
-            <Switch checked={!!incident.sent_to_telegram} disabled />
-          </p>
-          <p>
-            <strong>Отправлено в АРМ ЕДДС:</strong>{" "}
-            <Switch checked={!!incident.sent_to_arm_edds} disabled />
-          </p>
-          <p>
-            <strong>Отправлено на сайт Мособлэнерго:</strong>{" "}
-            <Switch checked={!!incident.sent_to_moenergo} disabled />
-          </p>
-          <p>
-            <strong>Отправлено на сайт Минэнерго:</strong>{" "}
-            <Switch checked={!!incident.sent_to_minenergo} disabled />
-          </p>
-        </Col>
-      </Row>
+        <Title level={5} style={{ marginTop: 16 }}>
+          Отправка данных
+        </Title>
+        <p>
+          <strong>Отправлено в Telegram:</strong>{" "}
+          <Switch checked={!!incident.sent_to_telegram} disabled />
+        </p>
+        <p>
+          <strong>Отправлено в АРМ ЕДДС:</strong>{" "}
+          <Switch checked={!!incident.sent_to_arm_edds} disabled />
+        </p>
+        <p>
+          <strong>Отправлено на сайт Мособлэнерго:</strong>{" "}
+          <Switch checked={!!incident.sent_to_moenergo} disabled />
+        </p>
+        <p>
+          <strong>Отправлено на сайт Минэнерго:</strong>{" "}
+          <Switch checked={!!incident.sent_to_minenergo} disabled />
+        </p>
+      </div>
+    );
+  };
 
-      <CloseIncidentModal
-        visible={closeModalVisible}
-        onCancel={() => setCloseModalVisible(false)}
-        incidentId={incident.documentId}
-        onSuccess={() => {
-          setCloseModalVisible(false);
-          onUpdate();
+  const rowClassName = (record) => {
+    return record.status_incident?.trim() === "в работе"
+      ? "active-row"
+      : "completed-row";
+  };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: "center", marginTop: 50 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div style={{ marginTop: 50 }}>
+        <Alert type="error" message={error} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: 20 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 15,
+        }}
+      >
+        <Title level={2} style={{ margin: 0 }}>
+          Технологические нарушения
+        </Title>
+        <Button type="primary" onClick={() => setNewModalVisible(true)}>
+          Новое ТН
+        </Button>
+      </div>
+      <div style={{ marginBottom: 15 }}>
+        <Space.Compact>
+          <Button
+            type={filter === "all" ? "primary" : "default"}
+            onClick={() => {
+              setFilter("all");
+              setCurrentPage(1);
+            }}
+          >
+            Все ТН
+          </Button>
+          <Button
+            type={filter === "active" ? "primary" : "default"}
+            onClick={() => {
+              setFilter("active");
+              setCurrentPage(1);
+            }}
+          >
+            В работе
+          </Button>
+          <Button
+            type={filter === "completed" ? "primary" : "default"}
+            onClick={() => {
+              setFilter("completed");
+              setCurrentPage(1);
+            }}
+          >
+            Выполненные
+          </Button>
+        </Space.Compact>
+      </div>
+      <Table
+        columns={columns}
+        dataSource={dataSource}
+        pagination={false}
+        expandable={{ expandedRowRender }}
+        rowClassName={rowClassName}
+      />
+      <div style={{ marginTop: 20, textAlign: "center" }}>
+        <Pagination
+          current={currentPage}
+          total={totalCount}
+          pageSize={pageSize}
+          onChange={(page) => setCurrentPage(page)}
+        />
+      </div>
+      <NewIncidentModal
+        visible={newModalVisible}
+        onCancel={() => {
+          setNewModalVisible(false);
+          fetchIncidents();
         }}
       />
-    </>
+      <CloseIncidentModal
+        visible={closeModalVisible}
+        incidentId={currentIncidentId}
+        onCancel={() => setCloseModalVisible(false)}
+        onSuccess={() => {
+          setCloseModalVisible(false);
+          message.success("ТН переведена в статус 'Выполнена'!");
+          fetchIncidents();
+        }}
+      />
+      <style jsx global>{`
+        .active-row {
+          background-color: #fff1f0 !important;
+        }
+        .completed-row {
+          background-color: #f6ffed !important;
+        }
+      `}</style>
+    </div>
   );
 }
 
@@ -385,6 +439,7 @@ function IncidentDetails({ incident, onUpdate }) {
 //   Switch,
 //   Button,
 //   Space,
+//   Pagination,
 // } from "antd";
 // import useAuthStore from "../../stores/authStore";
 // import { useIncidentsUtilsStore } from "../../stores/incidentsUtilsStore";
@@ -395,8 +450,6 @@ function IncidentDetails({ incident, onUpdate }) {
 
 // export default function MainContent() {
 //   const { token } = useAuthStore();
-
-//   // Список инцидентов и состояние загрузки
 //   const [incidents, setIncidents] = useState([]);
 //   const [loading, setLoading] = useState(true);
 //   const [error, setError] = useState(null);
@@ -404,28 +457,38 @@ function IncidentDetails({ incident, onUpdate }) {
 //   // Модалка "Новое ТН"
 //   const [newModalVisible, setNewModalVisible] = useState(false);
 
-//   // Фильтр по категориям: "all", "active", "completed"
+//   // Фильтр: "all", "active", "completed"
 //   const [filter, setFilter] = useState("all");
 
-//   // Функции из zustand-store для форматирования
-//   const {
-//     extractText,
-//     formatTime,
-//     formatDate,
-//     formatDateTime,
-//     getPanelHeader,
-//   } = useIncidentsUtilsStore();
+//   // Пагинация
+//   const [currentPage, setCurrentPage] = useState(1);
+//   const pageSize = 10;
 
-//   // Функция загрузки инцидентов (используем и при обновлении)
+//   // Функции для форматирования
+//   const { extractText, formatTime, formatDate, formatDateTime } =
+//     useIncidentsUtilsStore();
+
+//   /**
+//    * Вместо "ТН №…" показываем название города (если есть)
+//    * + дата + время
+//    */
+//   const getPanelHeader = (incident) => {
+//     const cityName = incident.AddressInfo?.city_district?.name || "Неизвестно";
+//     const d = formatDate(incident.start_date);
+//     const t = formatTime(incident.start_time);
+//     return `${cityName} ${d} ${t}`;
+//   };
+
+//   // Загрузка инцидентов, учитывая Relation city_district внутри AddressInfo
 //   const fetchIncidents = async () => {
 //     setLoading(true);
 //     try {
-//       const response = await fetch(
-//         "http://localhost:1337/api/incidents?populate=*",
-//         {
-//           headers: { Authorization: `Bearer ${token}` },
-//         }
-//       );
+//       const url =
+//         "http://localhost:1337/api/incidents?" +
+//         "populate[AddressInfo][populate]=city_district&populate=DisruptionStats";
+//       const response = await fetch(url, {
+//         headers: { Authorization: `Bearer ${token}` },
+//       });
 //       if (!response.ok) {
 //         throw new Error(`HTTP error! status: ${response.status}`);
 //       }
@@ -444,7 +507,7 @@ function IncidentDetails({ incident, onUpdate }) {
 //     }
 //   }, [token]);
 
-//   // Фильтрация инцидентов по выбранной категории
+//   // Фильтрация по статусу
 //   let filteredIncidents = [];
 //   if (filter === "all") {
 //     filteredIncidents = incidents;
@@ -458,24 +521,47 @@ function IncidentDetails({ incident, onUpdate }) {
 //     );
 //   }
 
-//   // Сортировка по дате и времени начала (от новых к старым)
+//   // Сортируем от новых к старым
 //   const sortedIncidents = [...filteredIncidents].sort((a, b) => {
 //     const dateA = new Date(`${a.start_date}T${a.start_time}`);
 //     const dateB = new Date(`${b.start_date}T${b.start_time}`);
 //     return dateB - dateA;
 //   });
 
-//   // Подготовка данных для Collapse через items prop
-//   const collapseItems = sortedIncidents.map((incident) => ({
-//     key: incident.id,
-//     label: getPanelHeader(incident),
-//     children: <IncidentDetails incident={incident} onUpdate={fetchIncidents} />,
-//     style: {
-//       background:
-//         incident.status_incident === "в работе" ? "#fff1f0" : "#f6ffed",
-//       marginBottom: 8,
-//     },
-//   }));
+//   // Пагинация
+//   const totalCount = sortedIncidents.length;
+//   const startIndex = (currentPage - 1) * pageSize;
+//   const endIndex = startIndex + pageSize;
+//   const pageIncidents = sortedIncidents.slice(startIndex, endIndex);
+
+//   // Формируем items для Collapse
+//   const collapseItems = pageIncidents.map((incident) => {
+//     const bgColor =
+//       incident.status_incident === "в работе" ? "#fff1f0" : "#f6ffed";
+//     return {
+//       key: incident.id,
+//       label: getPanelHeader(incident),
+//       children: (
+//         <IncidentDetails incident={incident} onUpdate={fetchIncidents} />
+//       ),
+//       style: { background: bgColor, marginBottom: 8 },
+//     };
+//   });
+
+//   if (loading) {
+//     return (
+//       <div style={{ textAlign: "center", marginTop: 50 }}>
+//         <Spin size="large" />
+//       </div>
+//     );
+//   }
+//   if (error) {
+//     return (
+//       <div style={{ marginTop: 50 }}>
+//         <Alert type="error" message={error} />
+//       </div>
+//     );
+//   }
 
 //   return (
 //     <div style={{ padding: 20 }}>
@@ -495,37 +581,50 @@ function IncidentDetails({ incident, onUpdate }) {
 //         </Button>
 //       </div>
 
-//       {/* Мини-фильтр по категориям */}
+//       {/* Мини-фильтр */}
 //       <div style={{ marginBottom: 15 }}>
 //         <Space.Compact>
 //           <Button
 //             type={filter === "all" ? "primary" : "default"}
-//             onClick={() => setFilter("all")}
+//             onClick={() => {
+//               setFilter("all");
+//               setCurrentPage(1);
+//             }}
 //           >
 //             Все ТН
 //           </Button>
 //           <Button
 //             type={filter === "active" ? "primary" : "default"}
-//             onClick={() => setFilter("active")}
+//             onClick={() => {
+//               setFilter("active");
+//               setCurrentPage(1);
+//             }}
 //           >
 //             В работе
 //           </Button>
 //           <Button
 //             type={filter === "completed" ? "primary" : "default"}
-//             onClick={() => setFilter("completed")}
+//             onClick={() => {
+//               setFilter("completed");
+//               setCurrentPage(1);
+//             }}
 //           >
 //             Выполненные
 //           </Button>
 //         </Space.Compact>
 //       </div>
 
-//       {loading ? (
-//         <Spin />
-//       ) : error ? (
-//         <Alert type="error" message={error} />
-//       ) : (
-//         <Collapse accordion items={collapseItems} />
-//       )}
+//       <Collapse accordion items={collapseItems} />
+
+//       {/* Пагинация */}
+//       <div style={{ marginTop: 20, textAlign: "center" }}>
+//         <Pagination
+//           current={currentPage}
+//           total={totalCount}
+//           pageSize={pageSize}
+//           onChange={(page) => setCurrentPage(page)}
+//         />
+//       </div>
 
 //       {/* Модалка создания нового ТН */}
 //       <NewIncidentModal
@@ -542,10 +641,8 @@ function IncidentDetails({ incident, onUpdate }) {
 // function IncidentDetails({ incident, onUpdate }) {
 //   const { extractText, formatTime, formatDate, formatDateTime } =
 //     useIncidentsUtilsStore();
-
 //   const [closeModalVisible, setCloseModalVisible] = useState(false);
 
-//   // Рассчитываем длительность
 //   let durationHours = null;
 //   if (incident.end_date && incident.end_time) {
 //     const start = new Date(`${incident.start_date}T${incident.start_time}`);
@@ -585,7 +682,6 @@ function IncidentDetails({ incident, onUpdate }) {
 //             </p>
 //           )}
 
-//           {/* Кнопка "Выполнена" (открывает модалку) */}
 //           {incident.status_incident?.trim() === "в работе" && (
 //             <Button
 //               type="default"
@@ -617,6 +713,12 @@ function IncidentDetails({ incident, onUpdate }) {
 //               <strong>Тип поселения:</strong>{" "}
 //               {incident.AddressInfo.settlement_type || "нет"}
 //             </p>
+//             {incident.AddressInfo.city_district && (
+//               <p>
+//                 <strong>Город:</strong>{" "}
+//                 {incident.AddressInfo.city_district.name}
+//               </p>
+//             )}
 //             <p>
 //               <strong>Улицы:</strong> {incident.AddressInfo.streets || "нет"}
 //             </p>
@@ -660,7 +762,7 @@ function IncidentDetails({ incident, onUpdate }) {
 //               {incident.DisruptionStats.affected_kindergartens || "0"}
 //             </p>
 //             <p>
-//               <strong>boiler_shutdown:</strong>{" "}
+//               <strong>Отключено бойлерных/котельн:</strong>{" "}
 //               {incident.DisruptionStats.boiler_shutdown || "0"}
 //             </p>
 //           </Col>
@@ -687,11 +789,10 @@ function IncidentDetails({ incident, onUpdate }) {
 //         </Col>
 //       </Row>
 
-//       {/* Модалка "Закрыть ТН" */}
 //       <CloseIncidentModal
 //         visible={closeModalVisible}
 //         onCancel={() => setCloseModalVisible(false)}
-//         incidentId={incident.documentId} // <-- передаём documentId
+//         incidentId={incident.documentId}
 //         onSuccess={() => {
 //           setCloseModalVisible(false);
 //           onUpdate();
