@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 export const useIncidentsUtilsStore = create(() => ({
+
   extractText: (richText) => {
     if (!richText || !Array.isArray(richText)) return "Нет данных";
     return richText
@@ -53,4 +54,5 @@ export const useIncidentsUtilsStore = create(() => ({
       incident.start_time
     )}`;
   },
+  
 }));

@@ -74,14 +74,14 @@ export default function MainContent() {
     setDateRange([dayjs(), dayjs()]);
   }, []);
 
+  //Автообнова каждые 30сек
   useEffect(() => {
     if (!token) return;
-    // Если любая из модалок открыта, не создаём интервал
     if (newModalVisible || closeModalVisible) return;
 
     const intervalId = setInterval(() => {
       fetchIncidents(token);
-    }, 30000); // 30 секунд
+    }, 30000);
 
     return () => clearInterval(intervalId);
   }, [token, fetchIncidents, newModalVisible, closeModalVisible]);
@@ -307,12 +307,9 @@ export default function MainContent() {
           }}
         >
           <Typography.Text strong>
-            Активных инцидентов: {activeIncidentsCount}
+            Активных активных инцидентов: {activeIncidentsCount}
           </Typography.Text>
           <br />
-          <Typography.Text strong>
-            Всего отключено жителей: {totalAffectedResidents}
-          </Typography.Text>
         </div>
 
         {/* Тут используем нашу отдельную таблицу */}
