@@ -76,11 +76,15 @@ export default function MainContent() {
 
   useEffect(() => {
     if (!token) return;
+    // Если любая из модалок открыта, не создаём интервал
+    if (newModalVisible || closeModalVisible) return;
+
     const intervalId = setInterval(() => {
       fetchIncidents(token);
-    }, 30000); // 30000 мс = 30 секунд
+    }, 30000); // 30 секунд
+
     return () => clearInterval(intervalId);
-  }, [token, fetchIncidents]);
+  }, [token, fetchIncidents, newModalVisible, closeModalVisible]);
 
   // Если идёт загрузка
   if (loading) {
@@ -204,6 +208,16 @@ export default function MainContent() {
     }
   };
 
+  // Вычисляем сводные показатели на основе filteredIncidents
+  const activeIncidentsCount = filteredIncidents.filter(
+    (item) => item.status_incident?.trim() === "в работе"
+  ).length;
+
+  const totalAffectedResidents = filteredIncidents.reduce((sum, item) => {
+    const residents = item.DisruptionStats?.affected_residents || "0";
+    return sum + parseInt(residents, 10);
+  }, 0);
+
   return (
     <ConfigProvider locale={ru_RU}>
       <div style={{ padding: 20 }}>
@@ -281,6 +295,24 @@ export default function MainContent() {
             }}
             allowClear
           />
+        </div>
+
+        <div
+          style={{
+            marginBottom: 20,
+            padding: "10px",
+            border: "1px solid #ddd",
+            borderRadius: "4px",
+            backgroundColor: "#f0f5ff",
+          }}
+        >
+          <Typography.Text strong>
+            Активных инцидентов: {activeIncidentsCount}
+          </Typography.Text>
+          <br />
+          <Typography.Text strong>
+            Всего отключено жителей: {totalAffectedResidents}
+          </Typography.Text>
         </div>
 
         {/* Тут используем нашу отдельную таблицу */}
