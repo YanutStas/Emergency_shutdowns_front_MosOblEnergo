@@ -17,6 +17,7 @@ import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import isBetween from "dayjs/plugin/isBetween";
 import "dayjs/locale/ru";
+import * as XLSX from "xlsx";
 
 dayjs.extend(customParseFormat);
 dayjs.extend(isBetween);
@@ -72,6 +73,14 @@ export default function MainContent() {
     // Только на клиенте выставляем "сегодня — сегодня"
     setDateRange([dayjs(), dayjs()]);
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const intervalId = setInterval(() => {
+      fetchIncidents(token);
+    }, 30000); // 30000 мс = 30 секунд
+    return () => clearInterval(intervalId);
+  }, [token, fetchIncidents]);
 
   // Если идёт загрузка
   if (loading) {
@@ -173,6 +182,28 @@ export default function MainContent() {
     setCloseModalVisible(true);
   };
 
+  // Функция экспорта
+  const handleExportExcel = () => {
+    try {
+      // Преобразуем dataSource, чтобы экспортировать только нужные поля с русскими заголовками.
+      const excelData = dataSource.map((item) => ({
+        Город: item.cityName,
+        Улицы: item.streets,
+        "Дата начала": item.startDateTime,
+        "Дата окончания": item.endDateTime,
+        Статус: item.status_incident,
+        "Прогнозируемое время включения (ч)": item.restHours,
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Incidents");
+      XLSX.writeFile(workbook, "incidents.xlsx");
+    } catch (error) {
+      console.error("Ошибка при экспорте:", error);
+    }
+  };
+
   return (
     <ConfigProvider locale={ru_RU}>
       <div style={{ padding: 20 }}>
@@ -191,6 +222,9 @@ export default function MainContent() {
             <Button type="primary" onClick={() => setNewModalVisible(true)}>
               Новое ТН
             </Button>
+
+            <Button onClick={handleExportExcel}>Экспорт в Excel</Button>
+
             {/* Кнопка для перехода на страницу статистики */}
             <Link href="/Stat">
               <Button>Статистика</Button>
