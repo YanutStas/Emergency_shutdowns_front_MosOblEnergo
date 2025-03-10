@@ -26,11 +26,7 @@ import Link from "next/link";
 
 import useAuthStore from "../../stores/authStore";
 import { useIncidentsUtilsStore } from "../../stores/incidentsUtilsStore";
-
-// Наш zustand-store для инцидентов
 import { useIncidentsDataStore } from "../../stores/incidentsDataStore";
-
-// Наш «чистый» компонент таблицы
 import IncidentsTable from "../IncidentsTable";
 
 // Модалки
@@ -54,14 +50,14 @@ export default function MainContent() {
   // Фильтр по статусу: "all", "active", "completed"
   const [filter, setFilter] = useState("all");
 
-  // Фильтр по периоду (две даты Day.js)
-  const [dateRange, setDateRange] = useState([dayjs(), dayjs()]);
+  // Изначально null, чтобы на сервере не было динамической даты
+  const [dateRange, setDateRange] = useState(null);
 
   // Пагинация
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  // Форматирующие функции из вашего стора
+  // Форматирующие функции из стора
   const { extractText, formatTime, formatDate, formatDateTime } =
     useIncidentsUtilsStore();
 
@@ -71,6 +67,11 @@ export default function MainContent() {
       fetchIncidents(token);
     }
   }, [token, fetchIncidents]);
+
+  useEffect(() => {
+    // Только на клиенте выставляем "сегодня — сегодня"
+    setDateRange([dayjs(), dayjs()]);
+  }, []);
 
   // Если идёт загрузка
   if (loading) {
@@ -239,7 +240,7 @@ export default function MainContent() {
 
           <RangePicker
             format="DD.MM.YYYY"
-            value={dateRange} // <-- Привязываем текущее состояние
+            value={dateRange || []} // Если null, передаём пустой массив
             onChange={(dates) => {
               setDateRange(dates);
               setCurrentPage(1);

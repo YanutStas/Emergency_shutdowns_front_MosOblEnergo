@@ -142,16 +142,27 @@ export default function IncidentsTable({
       title: "Городской округ",
       dataIndex: "cityName",
       key: "cityName",
+      sorter: (a, b) => a.cityName.localeCompare(b.cityName),
+      sortDirections: ["ascend", "descend"],
     },
     {
       title: "Улицы",
       dataIndex: "streets",
       key: "streets",
+      sorter: (a, b) => a.streets.localeCompare(b.streets),
+      sortDirections: ["ascend", "descend"],
     },
     {
       title: "Дата и время отключения",
       dataIndex: "startDateTime",
       key: "startDateTime",
+      // Если нужно сортировать как дату/время — используем dayjs (или new Date)
+      sorter: (a, b) => {
+        const tA = new Date(a.startDateTime).getTime();
+        const tB = new Date(b.startDateTime).getTime();
+        return tA - tB; // сортировка от ранних к более поздним
+      },
+      sortDirections: ["ascend", "descend"],
     },
     {
       title: "Дата окончания",
