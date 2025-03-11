@@ -8,7 +8,7 @@ const useAuthStore = create((set) => ({
   login: async (identifier, password) => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch("http://localhost:1337/api/auth/local", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/auth/local`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password }),

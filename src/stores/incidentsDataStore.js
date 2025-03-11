@@ -9,7 +9,7 @@ export const useIncidentsDataStore = create((set) => ({
     set({ loading: true, error: null });
     try {
       const url =
-        "http://localhost:1337/api/incidents?" +
+        `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/incidents?` +
         "populate[AddressInfo][populate]=city_district&populate=DisruptionStats";
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
