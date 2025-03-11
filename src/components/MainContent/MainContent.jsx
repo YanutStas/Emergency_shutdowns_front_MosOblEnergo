@@ -17,7 +17,9 @@ import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import isBetween from "dayjs/plugin/isBetween";
 import "dayjs/locale/ru";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+
+// import * as XLSX from "xlsx";
 
 dayjs.extend(customParseFormat);
 dayjs.extend(isBetween);
@@ -187,27 +189,50 @@ export default function MainContent() {
   };
 
   // Функция экспорта
-  const handleExportExcel = () => {
+  async function handleExportExcel() {
     try {
-      // Преобразуем dataSource, чтобы экспортировать только нужные поля с русскими заголовками.
-      const excelData = dataSource.map((item) => ({
-        Город: item.cityName,
-        Улицы: item.streets,
-        "Дата начала": item.startDateTime,
-        "Дата окончания": item.endDateTime,
-        Статус: item.status_incident,
-        "Прогнозируемое время включения (ч)": item.restHours,
-      }));
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Incidents");
 
-      const worksheet = XLSX.utils.json_to_sheet(excelData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Incidents");
-      XLSX.writeFile(workbook, "incidents.xlsx");
+      // Задаём заголовки столбцов
+      sheet.columns = [
+        { header: "Город", key: "cityName", width: 20 },
+        { header: "Улицы", key: "streets", width: 30 },
+        { header: "Дата начала", key: "startDateTime", width: 20 },
+        { header: "Дата окончания", key: "endDateTime", width: 20 },
+        { header: "Статус", key: "status_incident", width: 15 },
+        { header: "Прогноз (ч)", key: "restHours", width: 15 },
+      ];
+
+      // Заполняем строки
+      dataSource.forEach((item) => {
+        sheet.addRow({
+          cityName: item.cityName,
+          streets: item.streets,
+          startDateTime: item.startDateTime,
+          endDateTime: item.endDateTime,
+          status_incident: item.status_incident,
+          restHours: item.restHours,
+        });
+      });
+
+      // Генерируем файл как Blob
+      const buffer = await workbook.xlsx.writeBuffer();
+      // Скачиваем (пример для браузера)
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "incidents.xlsx";
+      link.click();
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Ошибка при экспорте:", error);
     }
-  };
-
+  }
+  
   // Вычисляем сводные показатели на основе filteredIncidents
   const activeIncidentsCount = filteredIncidents.filter(
     (item) => item.status_incident?.trim() === "в работе"
